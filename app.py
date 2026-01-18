@@ -6,31 +6,27 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
+# 加上这个，你用浏览器直接打开链接就不会报 404 了
+@app.route("/")
+def index():
+    return "<h1>API 运行中</h1><p>请使用 POST 请求访问 /v1/chat/completions</p>"
+
 @app.route("/v1/chat/completions", methods=["POST"])
 def chat():
     data = request.json
-    messages = data.get("messages")
-    
-    # 2026年 Railway 环境下实测最稳供应商
     try:
-        # 尝试 Nexra 提供的 Claude 3.5
-        from g4f.Provider import Nexra
+        # 强制指定目前最稳的 Claude 供应商
         response = g4f.ChatCompletion.create(
             model="claude-3-5-sonnet",
-            provider=Nexra,
-            messages=messages
+            provider=g4f.Provider.Nexra,
+            messages=data.get("messages"),
+            stream=False
         )
-        if response:
-            return jsonify({"choices": [{"message": {"role": "assistant", "content": str(response)}}]})
+        return jsonify({"choices": [{"message": {"role": "assistant", "content": str(response)}}]})
     except Exception as e:
-        # 如果失败，自动保底到 GPT-4o
-        try:
-            res = g4f.ChatCompletion.create(model="gpt-4o", messages=messages)
-            return jsonify({"choices": [{"message": {"role": "assistant", "content": f"(Claude拥挤，切换至GPT-4o): {str(res)}"}}]})
-        except:
-            return jsonify({"error": "Service Unavailable"}), 503
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    # Railway 必须读取环境变量中的 PORT
-    port = int(os.environ.get("PORT", 8080))
+    # Render 必须监听 10000 端口
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
