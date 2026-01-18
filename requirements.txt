@@ -1,4 +1,4 @@
-g4f
+g4f[all]
 flask
 flask-cors
 requests
