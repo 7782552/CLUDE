@@ -15,36 +15,61 @@ def chat():
     data = request.json
     messages = data.get("messages")
     
-    # 筛选出 2026 年目前对云服务器 IP 最宽容的供应商
+    # 2024年底仍可用的 Provider 列表（按稳定性排序）
     test_providers = [
-        g4f.Provider.Airforce, # 第一优先级：目前云端最稳
-        g4f.Provider.Blackbox, # 第二优先级：备用
-        g4f.Provider.DarkAI    # 第三优先级：保底
+        g4f.Provider.You,
+        g4f.Provider.Liaobots,
+        g4f.Provider.FreeChatgpt,
+        g4f.Provider.DeepInfra,
+        g4f.Provider.Replicate,
+        g4f.Provider.HuggingChat,
+    ]
+    
+    # 备选模型列表
+    models_to_try = [
+        "gpt-4",
+        "gpt-3.5-turbo",
+        "claude-3-sonnet",
+        "llama-2-70b",
     ]
     
     last_error = "Unknown error"
     
+    # 先尝试不指定 Provider（让 g4f 自动选择）
+    try:
+        response = g4f.ChatCompletion.create(
+            model=g4f.models.gpt_4,
+            messages=messages,
+            stream=False
+        )
+        if response and len(str(response)) > 5:
+            return jsonify({
+                "choices": [{"message": {"role": "assistant", "content": str(response)}}],
+                "model": "auto-selected"
+            })
+    except Exception as e:
+        last_error = str(e)
+    
+    # 然后尝试各个 Provider
     for provider in test_providers:
         try:
-            # 使用更强劲的请求模式
             response = g4f.ChatCompletion.create(
-                model="claude-3-5-sonnet",
+                model="gpt-3.5-turbo",
                 provider=provider,
                 messages=messages,
-                auth=True, # 尝试开启模拟授权
                 stream=False
             )
             
             if response and len(str(response)) > 5:
                 return jsonify({
                     "choices": [{"message": {"role": "assistant", "content": str(response)}}],
-                    "model": f"claude-3.5-via-{provider.__name__}"
+                    "model": f"via-{provider.__name__}"
                 })
         except Exception as e:
             last_error = str(e)
             continue
             
-    return jsonify({"error": f"所有通道暂不可用。最后一次尝试报错: {last_error}"}), 500
+    return jsonify({"error": f"所有通道暂不可用: {last_error}"}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
